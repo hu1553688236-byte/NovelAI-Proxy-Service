@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovelAI Studio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #7c5cbf;
+            --accent-hover: #9171d1;
+            --accent-glow: rgba(124, 92, 191, 0.3);
+            --success: #3fb950;
+            --error: #f85149;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* 导航 */
+        .navbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky; top: 0; z-index: 100;
+        }
+        .navbar-brand {
+            font-size: 20px; font-weight: 700; color: var(--accent);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .nav-right { display: flex; align-items: center; gap: 10px; }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--error); display: inline-block;
+        }
+        .status-dot.ok { background: var(--success); }
+
+        /* 弹窗 */
+        .modal-bg {
+            position: fixed; inset: 0; background: rgba(0,0,0,.7);
+            display: flex; align-items: center; justify-content: center; z-index: 200;
+        }
+        .modal-bg.hide { display: none; }
+        .modal {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 16px; padding: 36px; width: 400px; max-width: 90vw;
+        }
+        .modal h2 { color: var(--accent); margin-bottom: 6px; }
+        .modal p { color: var(--text-secondary); font-size: 14px; margin-bottom: 20px; }
+
+        /* 主布局 */
+        .main { display: grid; grid-template-columns: 370px 1fr; height: calc(100vh - 57px); }
+
+        /* 左侧面板 */
+        .panel {
+            background: var(--bg-secondary); border-right: 1px solid var(--border);
+            overflow-y: auto; padding: 20px;
+        }
+        .panel::-webkit-scrollbar { width: 5px; }
+        .panel::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
+
+        .sec { margin-bottom: 18px; }
+        .sec-title {
+            font-size: 11px; font-weight: 600; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
+        }
+
+        /* 表单 */
+        label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 5px; }
+        input[type="text"], input[type="number"], input[type="password"],
+        select, textarea {
+            width: 100%; padding: 9px 12px; background: var(--bg-tertiary);
+            border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text-primary); font-size: 14px; font-family: inherit;
+            outline: none; transition: border .2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
+        .fg { margin-bottom: 12px; }
+        .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        /* 滑块 */
+        .sl-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .sl-val {
+            font-size: 13px; color: var(--accent); font-weight: 600;
+            background: var(--bg-tertiary); padding: 1px 7px; border-radius: 4px;
+        }
+        input[type="range"] {
+            width: 100%; height: 6px; -webkit-appearance: none;
+            background: var(--bg-tertiary); border-radius: 3px; outline: none; margin-bottom: 14px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+            background: var(--accent); cursor: pointer;
+        }
+
+        /* 按钮 */
+        .btn {
+            padding: 10px 18px; border: none; border-radius: 8px; font-size: 14px;
+            font-weight: 600; cursor: pointer; transition: all .2s;
+            display: inline-flex; align-items: center; gap: 7px;
+        }
+        .btn-main {
+            background: var(--accent); color: #fff; width: 100%;
+            padding: 14px; font-size: 15px; justify-content: center;
+        }
+        .btn-main:hover { background: var(--accent-hover); }
+        .btn-main:disabled { opacity: .45; cursor: not-allowed; }
+        .btn-sm {
+            padding: 6px 12px; font-size: 12px; background: var(--bg-tertiary);
+            color: var(--text-primary); border: 1px solid var(--border);
+        }
+        .btn-sm:hover { border-color: var(--accent); }
+
+        /* 预设标签 */
+        .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+        .tag {
+            padding: 3px 9px; background: var(--bg-tertiary); border: 1px solid var(--border);
+            border-radius: 20px; font-size: 12px; color: var(--text-secondary); cursor: pointer;
+        }
+        .tag:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* 右侧预览 */
+        .preview {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 30px; overflow-y: auto;
+            background: radial-gradient(circle at 20% 50%, rgba(124,92,191,.04) 0%, transparent 50%),
+                        var(--bg-primary);
+        }
+        .ph { text-align: center; color: var(--text-secondary); }
+        .ph h3 { margin-bottom: 6px; }
+        .ph p { font-size: 14px; }
+        #previewImg {
+            max-width: 100%; max-height: calc(100vh - 180px); border-radius: 12px;
+            box-shadow: 0 8px 40px rgba(0,0,0,.4); display: none;
+        }
+        .img-actions { display: flex; gap: 8px; margin-top: 14px; }
+        .img-actions.hide { display: none; }
+
+        /* 历史 */
+        .hist {
+            display: flex; gap: 6px; margin-top: 14px; overflow-x: auto;
+            width: 100%; max-width: 800px; padding: 4px 0;
+        }
+        .hist img {
+            width: 56px; height: 56px; border-radius: 6px; object-fit: cover;
+            cursor: pointer; border: 2px solid transparent; flex-shrink: 0;
+        }
+        .hist img:hover { border-color: var(--accent); transform: scale(1.1); }
+
+        /* 进度条 */
+        .pbar { width: 100%; height: 3px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+        .pbar.hide { display: none; }
+        .pfill {
+            height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+            animation: inde 1.5s ease-in-out infinite;
+        }
+        @keyframes inde {
+            0% { width: 0; margin-left: 0; }
+            50% { width: 60%; margin-left: 20%; }
+            100% { width: 0; margin-left: 100%; }
+        }
+
+        /* Toast */
+        .toast-box { position: fixed; top: 68px; right: 20px; z-index: 300; }
+        .toast {
+            padding: 10px 18px; border-radius: 8px; font-size: 14px; color: #fff;
+            margin-bottom: 6px; animation: tIn .3s ease;
+            box-shadow: 0 4px 16px rgba(0,0,0,.3);
+        }
+        .toast.err { background: var(--error); }
+        .toast.ok { background: var(--success); }
+        @keyframes tIn { from { transform: translateX(80px); opacity: 0; } }
+
+        @media (max-width: 768px) {
+            .main { grid-template-columns: 1fr; }
+            .panel { border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- 导航 -->
+<nav class="navbar">
+    <div class="navbar-brand">🎨 NovelAI Studio</div>
+    <div class="nav-right">
+        <span class="status-dot" id="sDot"></span>
+        <span id="sTxt" style="font-size:13px;color:var(--text-secondary)">未连接</span>
+        <button class="btn btn-sm" onclick="showModal()" id="connBtn">设置连接</button>
+        <button class="btn btn-sm" onclick="logout()" id="dcBtn" style="display:none">断开</button>
+    </div>
+</nav>
+
+<!-- 登录弹窗 -->
+<div class="modal-bg" id="modal">
+    <div class="modal">
+        <h2>🔗 连接到服务</h2>
+        <p>输入代理地址和你的 Token</p>
+        <div class="fg">
+            <label>服务器地址</label>
+            <input type="text" id="iUrl" placeholder="https://your-app.zeabur.app" />
+        </div>
+        <div class="fg">
+            <label>Token</label>
+            <input type="password" id="iToken" placeholder="你的专属 Token" />
+        </div>
+        <br>
+        <button class="btn btn-main" onclick="connect()">连接</button>
+    </div>
+</div>
+
+<!-- 主体 -->
+<div class="main">
+
+    <!-- 左侧面板 -->
+    <div class="panel">
+
+        <div class="sec">
+            <div class="sec-title">📝 提示词</div>
+            <div class="fg">
+                <textarea id="prompt" placeholder="masterpiece, best quality, 1girl, ..."></textarea>
+                <div class="tags">
+                    <span class="tag" onclick="addTag('masterpiece, best quality')">高质量</span>
+                    <span class="tag" onclick="addTag('1girl')">1girl</span>
+                    <span class="tag" onclick="addTag('1boy')">1boy</span>
+                    <span class="tag" onclick="addTag('beautiful detailed eyes')">精致眼睛</span>
+                    <span class="tag" onclick="addTag('scenery, landscape')">风景</span>
+                    <span class="tag" onclick="addTag('night sky, stars')">星空</span>
+                </div>
+            </div>
+            <div class="fg">
+                <label>反向提示词</label>
+                <textarea id="neg" rows="3">lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract]</textarea>
+            </div>
+        </div>
+
+        <div class="sec">
+            <div class="sec-title">⚙️ 模型</div>
+            <div class="fg">
+                <label>模型</label>
+                <select id="model">
+                    <option value="nai-diffusion-4-curated-preview">V4 Curated</option>
+                    <option value="nai-diffusion-4-full" selected>V4 Full</option>
+                    <option value="nai-diffusion-3">V3 Anime</option>
+                    <option value="nai-diffusion-furry-3">V3 Furry</option>
+                </select>
+            </div>
+            <div class="fg">
+                <label>尺寸预设</label>
+                <select id="szPre" onchange="applySize()">
+                    <option value="832,1216">竖版 832×1216</option>
+                    <option value="1216,832">横版 1216×832</option>
+                    <option value="1024,1024">正方 1024×1024</option>
+                    <option value="512,768">小竖 512×768</option>
+                    <option value="custom">自定义</option>
+                </select>
+            </div>
+            <div class="row2">
+                <div class="fg"><label>宽</label><input type="number" id="w" value="832" step="64" /></div>
+                <div class="fg"><label>高</label><input type="number" id="h" value="1216" step="64" /></div>
+            </div>
+        </div>
+
+        <div class="sec">
+            <div class="sec-title">🎛️ 采样参数</div>
+            <div class="fg">
+                <label>采样器</label>
+                <select id="sampler">
+                    <option value="k_euler" selected>Euler</option>
+                    <option value="k_euler_ancestral">Euler A</option>
+                    <option value="k_dpmpp_2s_ancestral">DPM++ 2S A</option>
+                    <option value="k_dpmpp_2m_sde">DPM++ 2M SDE</option>
+                    <option value="k_dpmpp_sde">DPM++ SDE</option>
+                </select>
+            </div>
+
+            <div class="sl-head"><label>步数</label><span class="sl-val" id="stV">28</span></div>
+            <input type="range" id="steps" min="1" max="50" value="28" oninput="$('stV').textContent=this.value">
+
+            <div class="sl-head"><label>CFG Scale</label><span class="sl-val" id="cfV">5.0</span></div>
+            <input type="range" id="cfg" min="1" max="20" value="5" step="0.5" oninput="$('cfV').textContent=(+this.value).toFixed(1)">
+
+            <div class="sl-head"><label>Rescale</label><span class="sl-val" id="rsV">0.00</span></div>
+            <input type="range" id="rescale" min="0" max="1" value="0" step="0.02" oninput="$('rsV').textContent=(+this.value).toFixed(2)">
+
+            <div class="fg">
+                <label>种子 (空=随机)</label>
+                <div style="display:flex;gap:6px">
+                    <input type="number" id="seed" placeholder="随机" style="flex:1">
+                    <button class="btn btn-sm" onclick="$('seed').value=Math.floor(Math.random()*4294967295)">🎲</button>
+                </div>
+            </div>
+
+            <div class="fg">
+                <label>SMEA</label>
+                <select id="smea">
+                    <option value="none">关闭</option>
+                    <option value="SMEA" selected>SMEA</option>
+                    <option value="SMEA+DYN">SMEA+DYN</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn btn-main" id="genBtn" onclick="generate()" disabled>✨ 生成图像</button>
+        <div class="pbar hide" id="pbar"><div class="pfill"></div></div>
+    </div>
+
+    <!-- 右侧预览 -->
+    <div class="preview">
+        <div class="ph" id="ph">
+            <h3>🖼️ 等待生成</h3>
+            <p>设置参数后点击「生成图像」</p>
+        </div>
+        <img id="previewImg" />
+        <div class="img-actions hide" id="imgAct">
+            <button class="btn btn-sm" onclick="downloadImg()">💾 下载</button>
+            <button class="btn btn-sm" onclick="copyPromptBack()">📋 复制参数</button>
+        </div>
+        <div class="hist" id="hist"></div>
+    </div>
+
+</div>
+
+<div class="toast-box" id="toastBox"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+let SERVER = '';
+let TOKEN = '';
+let history = [];
+
+// ===== 连接 =====
+function showModal() { $('modal').classList.remove('hide'); }
+
+function connect() {
+    SERVER = $('iUrl').value.replace(/\/+$/, '');
+    TOKEN = $('iToken').value.trim();
+    if (!SERVER || !TOKEN) return toast('请填写完整', 'err');
+
+    localStorage.setItem('nai_server', SERVER);
+    localStorage.setItem('nai_token', TOKEN);
+
+    $('modal').classList.add('hide');
+    $('sDot').classList.add('ok');
+    $('sTxt').textContent = '已连接';
+    $('connBtn').style.display = 'none';
+    $('dcBtn').style.display = '';
+    $('genBtn').disabled = false;
+    toast('连接成功', 'ok');
+}
+
+function logout() {
+    SERVER = ''; TOKEN = '';
+    localStorage.removeItem('nai_server');
+    localStorage.removeItem('nai_token');
+    $('sDot').classList.remove('ok');
+    $('sTxt').textContent = '未连接';
+    $('connBtn').style.display = '';
+    $('dcBtn').style.display = 'none';
+    $('genBtn').disabled = true;
+}
+
+// 自动恢复
+(function autoLogin() {
+    const s = localStorage.getItem('nai_server');
+    const t = localStorage.getItem('nai_token');
+    if (s && t) { $('iUrl').value = s; $('iToken').value = t; connect(); }
+})();
+
+// ===== 尺寸预设 =====
+function applySize() {
+    const v = $('szPre').value;
+    if (v === 'custom') return;
+    const [w, h] = v.split(',');
+    $('w').value = w; $('h').value = h;
+}
+
+// ===== 标签 =====
+function addTag(t) {
+    const el = $('prompt');
+    el.value = el.value ? el.value.replace(/,?\s*$/, '') + ', ' + t : t;
+}
+
+// ===== 生成 =====
+async function generate() {
+    const btn = $('genBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 生成中...';
+    $('pbar').classList.remove('hide');
+
+    const seed = $('seed').value ? parseInt($('seed').value) : Math.floor(Math.random() * 4294967295);
+    const smea = $('smea').value;
+
+    const body = {
+        input: $('prompt').value,
+        model: $('model').value,
+        action: "generate",
+        parameters: {
+            width: parseInt($('w').value),
+            height: parseInt($('h').value),
+            scale: parseFloat($('cfg').value),
+            sampler: $('sampler').value,
+            steps: parseInt($('steps').value),
+            seed: seed,
+            n_samples: 1,
+            ucPreset: 0,
+            qualityToggle: true,
+            sm: smea === 'SMEA' || smea === 'SMEA+DYN',
+            sm_dyn: smea === 'SMEA+DYN',
+            cfg_rescale: parseFloat($('rescale').value),
+            noise_schedule: "native",
+            negative_prompt: $('neg').value
+        }
+    };
+
+    try {
+        const res = await fetch(SERVER + '/ai/generate-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + TOKEN
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`${res.status}: ${errText.substring(0, 200)}`);
+        }
+
+        const data = await res.text();
+
+        // 尝试解析返回格式 (可能是 base64 或 zip)
+        let imgSrc = '';
+
+        if (data.startsWith('data:')) {
+            imgSrc = data;
+        } else {
+            try {
+                const json = JSON.parse(data);
+                if (json.image) {
+                    imgSrc = 'data:image/png;base64,' + json.image;
+                } else if (json.images && json.images[0]) {
+                    imgSrc = 'data:image/png;base64,' + json.images[0];
+                } else if (json.data) {
+                    imgSrc = 'data:image/png;base64,' + json.data;
+                }
+            } catch {
+                // 可能直接是 base64
+                if (data.length > 1000) {
+                    imgSrc = 'data:image/png;base64,' + data.replace(/^[\s"]+|[\s"]+$/g, '');
+                }
+            }
+        }
+
+        // 如果是 zip 格式 (NovelAI 默认返回 zip)
+        if (!imgSrc && res.headers.get('content-type')?.includes('zip')) {
+            const blob = await res.blob();
+            // 这里需要重新请求...简化处理
+            imgSrc = URL.createObjectURL(blob);
+        }
+
+        if (!imgSrc) {
+            // 最后尝试：直接当 blob 处理
+            throw new Error('无法解析返回的图像数据');
+        }
+
+        // 显示图像
+        $('ph').style.display = 'none';
+        $('previewImg').src = imgSrc;
+        $('previewImg').style.display = 'block';
+        $('imgAct').classList.remove('hide');
+
+        // 加入历史
+        history.unshift({ src: imgSrc, prompt: $('prompt').value, seed: seed });
+        if (history.length > 20) history.pop();
+        renderHistory();
+
+        toast('生成成功！种子: ' + seed, 'ok');
+
+    } catch (e) {
+        toast('生成失败: ' + e.message, 'err');
+        console.error(e);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ 生成图像';
+        $('pbar').classList.add('hide');
+    }
+}
+
+// ===== 历史 =====
+function renderHistory() {
+    $('hist').innerHTML = history.map((h, i) =>
+        `<img src="${h.src}" onclick="showHist(${i})" title="Seed: ${h.seed}" />`
+    ).join('');
+}
+
+function showHist(i) {
+    $('previewImg').src = history[i].src;
+    $('previewImg').style.display = 'block';
+    $('ph').style.display = 'none';
+    $('imgAct').classList.remove('hide');
+}
+
+// ===== 下载 =====
+function downloadImg() {
+    const a = document.createElement('a');
+    a.href = $('previewImg').src;
+    a.download = 'novelai_' + Date.now() + '.png';
+    a.click();
+}
+
+function copyPromptBack() {
+    navigator.clipboard.writeText($('prompt').value);
+    toast('已复制提示词', 'ok');
+}
+
+// ===== Toast =====
+function toast(msg, type) {
+    const d = document.createElement('div');
+    d.className = 'toast ' + type;
+    d.textContent = msg;
+    $('toastBox').appendChild(d);
+    setTimeout(() => d.remove(), 3500);
+}
+</script>
+</body>
+</html>
